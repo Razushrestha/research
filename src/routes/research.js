@@ -3,11 +3,12 @@ const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
+const { getUploadDirName, getUploadAbsolutePath } = require('../uploadPaths');
 const { parseResearcherNames, toNonNegativeInteger } = require('../utils/validation');
 
 const router = express.Router();
-const uploadDir = process.env.UPLOAD_DIR || 'uploads';
-const uploadPath = path.join(__dirname, '..', '..', uploadDir);
+const uploadDir = getUploadDirName();
+const uploadPath = getUploadAbsolutePath();
 
 const storage = multer.diskStorage({
   destination(req, file, cb) {

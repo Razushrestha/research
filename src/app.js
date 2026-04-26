@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 const db = require('./db');
+const { getUploadDirName, getUploadAbsolutePath } = require('./uploadPaths');
 const researchRoutes = require('./routes/research');
 const paymentRoutes = require('./routes/payment');
 
@@ -46,9 +47,18 @@ function createApp() {
   });
   app.use(limiter);
 
-  const uploadDir = process.env.UPLOAD_DIR || 'uploads';
-  const uploadPath = path.resolve(__dirname, '..', uploadDir);
-  fs.mkdirSync(uploadPath, { recursive: true });
+  const uploadDir = getUploadDirName();
+  let uploadPath = getUploadAbsolutePath();
+  try {
+    fs.mkdirSync(uploadPath, { recursive: true });
+  } catch (err) {
+    if (err.code === 'EACCES' || err.code === 'EROFS') {
+      uploadPath = path.join('/tmp', uploadDir);
+      fs.mkdirSync(uploadPath, { recursive: true });
+    } else {
+      throw err;
+    }
+  }
   app.use(`/${uploadDir}`, express.static(uploadPath));
 
   app.get('/health', async (req, res) => {
