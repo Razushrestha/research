@@ -3,14 +3,22 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error('DATABASE_URL is required in .env');
+let pool;
+
+function getPool() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL is required in .env');
+  }
+  if (!pool) {
+    pool = new Pool({ connectionString });
+  }
+  return pool;
 }
 
-const pool = new Pool({ connectionString });
-
 module.exports = {
-  query: (text, params) => pool.query(text, params),
-  pool,
+  query: (text, params) => getPool().query(text, params),
+  get pool() {
+    return getPool();
+  },
 };
