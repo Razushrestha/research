@@ -1,4 +1,9 @@
 {
+  "build": {
+    "env": {
+      "NODE_ENV": "production"
+    }
+  },
   "installCommand": "npm ci --omit=dev",
   "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
 }
