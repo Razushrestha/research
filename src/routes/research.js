@@ -1,7 +1,7 @@
+const crypto = require('crypto');
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
 const { getUploadDirName, getUploadAbsolutePath } = require('../uploadPaths');
 const { parseResearcherNames, toNonNegativeInteger } = require('../utils/validation');
@@ -16,7 +16,7 @@ const storage = multer.diskStorage({
   },
   filename(req, file, cb) {
     const ext = path.extname(file.originalname);
-    cb(null, `${Date.now()}-${uuidv4()}${ext}`);
+    cb(null, `${Date.now()}-${crypto.randomUUID()}${ext}`);
   },
 });
 
