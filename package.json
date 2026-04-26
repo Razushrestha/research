@@ -9,7 +9,7 @@
     "test": "cross-env NODE_ENV=test jest --forceExit"
   },
   "engines": {
-    "node": ">=18"
+    "node": "20.x"
   },
   "dependencies": {
     "cors": "^2.8.5",
