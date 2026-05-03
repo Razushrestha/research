@@ -159,6 +159,100 @@ router.get('/my/:email', async (req, res) => {
   }
 });
 
+router.post('/:id/download', async (req, res) => {
+  try {
+    const paperId = Number(req.params.id);
+    const userEmail = String(req.body.user_email || '').trim().toLowerCase();
+    if (!userEmail) {
+      return res.status(400).json({ error: 'user_email is required.' });
+    }
+
+    const paperResult = await db.query('SELECT id, type, title, file_url, status FROM research_papers WHERE id = $1', [paperId]);
+    if (paperResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Paper not found.' });
+    }
+    const paper = paperResult.rows[0];
+
+    if (paper.type === 'paid') {
+      const paymentResult = await db.query(
+        `SELECT id FROM payments
+         WHERE paper_id = $1 AND buyer_email = $2 AND status = 'completed'
+         ORDER BY created_at DESC LIMIT 1`,
+        [paperId, userEmail]
+      );
+      if (paymentResult.rows.length === 0) {
+        return res.status(403).json({ error: 'Complete payment before downloading this paid paper.' });
+      }
+    }
+
+    await db.query(
+      `INSERT INTO paper_access (paper_id, user_email, access_type, last_read_at, progress_pct, updated_at)
+       VALUES ($1, $2, 'download', NOW(), 0, NOW())
+       ON CONFLICT (paper_id, user_email)
+       DO UPDATE SET access_type = EXCLUDED.access_type, last_read_at = NOW(), updated_at = NOW()`,
+      [paperId, userEmail]
+    );
+
+    return res.json({
+      message: 'Download access recorded.',
+      paper: {
+        id: paper.id,
+        title: paper.title,
+        type: paper.type,
+        file_url: paper.file_url,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Failed to record download access.' });
+  }
+});
+
+router.get('/continue-reading/:email', async (req, res) => {
+  try {
+    const email = String(req.params.email || '').trim().toLowerCase();
+    const result = await db.query(
+      `SELECT pa.paper_id, pa.user_email, pa.access_type, pa.last_read_at, pa.progress_pct,
+              rp.title, rp.description, rp.file_url, rp.type, rp.price
+       FROM paper_access pa
+       JOIN research_papers rp ON rp.id = pa.paper_id
+       WHERE pa.user_email = $1
+       ORDER BY pa.last_read_at DESC`,
+      [email]
+    );
+    return res.json({ data: result.rows });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Failed to fetch continue reading list.' });
+  }
+});
+
+router.patch('/continue-reading/:paperId/progress', async (req, res) => {
+  try {
+    const paperId = Number(req.params.paperId);
+    const userEmail = String(req.body.user_email || '').trim().toLowerCase();
+    const progressPct = Number(req.body.progress_pct);
+    if (!userEmail || Number.isNaN(progressPct) || progressPct < 0 || progressPct > 100) {
+      return res.status(400).json({ error: 'user_email and progress_pct (0-100) are required.' });
+    }
+
+    const result = await db.query(
+      `UPDATE paper_access
+       SET progress_pct = $1, last_read_at = NOW(), updated_at = NOW()
+       WHERE paper_id = $2 AND user_email = $3
+       RETURNING *`,
+      [Math.round(progressPct), paperId, userEmail]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Reading record not found. Download or purchase first.' });
+    }
+    return res.json({ data: result.rows[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Failed to update reading progress.' });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
